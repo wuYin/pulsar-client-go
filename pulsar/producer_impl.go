@@ -114,6 +114,7 @@ func newProducer(client *client, options *ProducerOptions) (*producer, error) {
 		p.messageRouter = options.MessageRouter
 	}
 
+	// NOTE: lookup and connect to broker for every partition
 	err := p.internalCreatePartitionsProducers()
 	if err != nil {
 		return nil, err
@@ -128,6 +129,7 @@ func newProducer(client *client, options *ProducerOptions) (*producer, error) {
 			select {
 			case <-ticker.C:
 				p.log.Debug("Auto discovering new partitions")
+				// NOTE: interval detect new partition and create producer
 				p.internalCreatePartitionsProducers()
 			case <-p.tickerStop:
 				return
@@ -181,6 +183,7 @@ func (p *producer) internalCreatePartitionsProducers() error {
 	partitionsToAdd := newNumPartitions - oldNumPartitions
 	c := make(chan ProducerError, partitionsToAdd)
 
+	// NOTE: concurrent create partition producer
 	for partitionIdx := oldNumPartitions; partitionIdx < newNumPartitions; partitionIdx++ {
 		partition := partitions[partitionIdx]
 
@@ -258,6 +261,7 @@ func (p *producer) getPartition(msg *ProducerMessage) Producer {
 	return producers[partition]
 }
 
+// NOTE: max seq id of all partitions
 func (p *producer) LastSequenceID() int64 {
 	p.RLock()
 	defer p.RUnlock()

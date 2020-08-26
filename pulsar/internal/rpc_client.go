@@ -64,6 +64,7 @@ type RPCClient interface {
 	RequestOnCnx(cnx Connection, requestID uint64, cmdType pb.BaseCommand_Type, message proto.Message) (*RPCResult, error)
 }
 
+// NOTE: wrap conn pool with retry, and id generators
 type rpcClient struct {
 	serviceURL          *url.URL
 	pool                ConnectionPool
@@ -89,6 +90,7 @@ func (c *rpcClient) RequestToAnyBroker(requestID uint64, cmdType pb.BaseCommand_
 	return c.Request(c.serviceURL, c.serviceURL, requestID, cmdType, message)
 }
 
+// NOTE: send cmd to any broker, wait resp with timeout
 func (c *rpcClient) Request(logicalAddr *url.URL, physicalAddr *url.URL, requestID uint64,
 	cmdType pb.BaseCommand_Type, message proto.Message) (*RPCResult, error) {
 	rpcRequestCount.Inc()
@@ -120,6 +122,7 @@ func (c *rpcClient) Request(logicalAddr *url.URL, physicalAddr *url.URL, request
 	}
 }
 
+// NOTE: load conn from pool with backoff retry if failed
 func (c *rpcClient) getConn(logicalAddr *url.URL, physicalAddr *url.URL) (Connection, error) {
 	cnx, err := c.pool.GetConnection(logicalAddr, physicalAddr)
 	backoff := Backoff{1 * time.Second}
@@ -141,6 +144,7 @@ func (c *rpcClient) getConn(logicalAddr *url.URL, physicalAddr *url.URL) (Connec
 	return cnx, nil
 }
 
+// NOTE: send cmd to specific connected broker, block wait resp
 func (c *rpcClient) RequestOnCnx(cnx Connection, requestID uint64, cmdType pb.BaseCommand_Type,
 	message proto.Message) (*RPCResult, error) {
 	rpcRequestCount.Inc()
@@ -162,6 +166,8 @@ func (c *rpcClient) RequestOnCnx(cnx Connection, requestID uint64, cmdType pb.Ba
 	return rpcResult, rpcErr
 }
 
+// NOTE: send FLOW/ACK/REDELIVERY CMD to broker, without id/waiting callback
+// NOTE: this maybe block if cnx.incomingRequestsCh is fulled
 func (c *rpcClient) RequestOnCnxNoWait(cnx Connection, cmdType pb.BaseCommand_Type, message proto.Message) {
 	rpcRequestCount.Inc()
 	cnx.SendRequestNoWait(baseCommand(cmdType, message))

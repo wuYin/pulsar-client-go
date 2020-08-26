@@ -61,6 +61,7 @@ func NewConnectionPool(
 	}
 }
 
+// NOTE: round load logicalAddr conn from pool, or create one
 func (p *connectionPool) GetConnection(logicalAddr *url.URL, physicalAddr *url.URL) (Connection, error) {
 	key := p.getMapKey(logicalAddr)
 	cachedCnx, found := p.pool.Load(key)

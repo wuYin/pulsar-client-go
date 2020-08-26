@@ -108,6 +108,7 @@ func (ls *lookupService) Lookup(topic string) (*LookupResult, error) {
 		lr := res.Response.LookupTopicResponse
 		switch *lr.Response {
 
+		// NOTE: 1. redirected, construct new LOOKUP CMD to new target broker
 		case pb.CommandLookupTopicResponse_Redirect:
 			logicalAddress, physicalAddr, err := ls.getBrokerAddress(lr)
 			if err != nil {
@@ -130,6 +131,7 @@ func (ls *lookupService) Lookup(topic string) (*LookupResult, error) {
 			// Process the response at the top of the loop
 			continue
 
+		// NOTE: 2. get target broker addresses
 		case pb.CommandLookupTopicResponse_Connect:
 			log.Debugf("Successfully looked up topic{%s} on broker. %s / %s - Use proxy: %t",
 				topic, lr.GetBrokerServiceUrl(), lr.GetBrokerServiceUrlTls(), lr.GetProxyThroughServiceUrl())
@@ -144,6 +146,7 @@ func (ls *lookupService) Lookup(topic string) (*LookupResult, error) {
 				PhysicalAddr: physicalAddress,
 			}, nil
 
+		// NOTE: 3. topic may not exist
 		case pb.CommandLookupTopicResponse_Failed:
 			errorMsg := ""
 			if lr.Error != nil {

@@ -76,7 +76,7 @@ type consumer struct {
 	closeOnce sync.Once
 	closeCh   chan struct{}
 	errorCh   chan error
-	ticker    *time.Ticker
+	ticker    *time.Ticker // NOTE: auto discovery interval
 
 	log *log.Entry
 }
@@ -240,6 +240,7 @@ func (c *consumer) internalTopicSubscribeToPartitions() error {
 	ch := make(chan ConsumerError, partitionsToAdd)
 	wg.Add(partitionsToAdd)
 
+	// NOTE: concurrent create partition consumer
 	for partitionIdx := oldNumPartitions; partitionIdx < newNumPartitions; partitionIdx++ {
 		partitionTopic := partitions[partitionIdx]
 
@@ -268,6 +269,7 @@ func (c *consumer) internalTopicSubscribeToPartitions() error {
 				readCompacted:              c.options.ReadCompacted,
 				interceptors:               c.options.Interceptors,
 			}
+			// NOTE: consumer <-- c.messageCh <-- partitionConsumer
 			cons, err := newPartitionConsumer(c, c.client, opts, c.messageCh, c.dlq)
 			ch <- ConsumerError{
 				err:       err,

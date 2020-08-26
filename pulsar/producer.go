@@ -70,6 +70,7 @@ type ProducerOptions struct {
 	// When specifying a name, it is up to the user to ensure that, for a given topic, the producer name is unique
 	// across all Pulsar's clusters. Brokers will enforce that only a single producer a given name can be publishing on
 	// a topic.
+	// NOTE: ensure producerName:topic must be 1:1
 	Name string
 
 	// Properties attach a set of application defined properties to the producer
@@ -119,8 +120,10 @@ type ProducerOptions struct {
 	// contents.
 	// When enabled default batch delay is set to 1 ms and default batch size is 1000 messages
 	// Setting `DisableBatching: true` will make the producer to send messages individually
+	// NOTE: producer --send-async--> accumulate msgs(1ms / 1000msgs) --batch--> broker
 	DisableBatching bool
 
+	// NOTE: configure batch in delay / msgs / size
 	// BatchingMaxPublishDelay set the time period within which the messages sent will be batched (default: 10ms)
 	// if batch messages are enabled. If set to a non zero value, messages will be queued until this time
 	// interval or until

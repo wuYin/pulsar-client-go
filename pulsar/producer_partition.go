@@ -96,19 +96,21 @@ type partitionProducer struct {
 	producerName        string
 	producerID          uint64
 	batchBuilder        *internal.BatchBuilder
-	sequenceIDGenerator *uint64
-	batchFlushTicker    *time.Ticker
+	sequenceIDGenerator *uint64 // NOTE: generate seq id for batch
 
 	// Channel where app is posting messages to be published
-	eventsChan chan interface{}
+	// NOTE: pending message components
+	eventsChan       chan interface{} // NOTE: 1. buffered channel to store msgs
+	batchFlushTicker *time.Ticker     // NOTE: 2. batch flush interval
 
-	publishSemaphore internal.Semaphore
-	pendingQueue     internal.BlockingQueue
+	publishSemaphore internal.Semaphore     // NOTE: 3. flow control
+	pendingQueue     internal.BlockingQueue // NOTE: 4. storage batch msg until receive receipt
 	lastSequenceID   int64
 
 	partitionIdx int32
 }
 
+// NOTE: connect to broker, open write goroutine
 func newPartitionProducer(client *client, topic string, options *ProducerOptions, partitionIdx int) (
 	*partitionProducer, error) {
 	var batchingMaxPublishDelay time.Duration
@@ -160,6 +162,9 @@ func newPartitionProducer(client *client, topic string, options *ProducerOptions
 	return p, nil
 }
 
+// NOTE: lookup and connect to target broker, send CMD PRODUCER to register myself
+// NOTE: register myself to cnx, to call ReceivedSendReceipt when produce succeed
+// NOTE: sync last seq id and flush last pending batch data
 func (p *partitionProducer) grabCnx() error {
 	lr, err := p.client.lookupService.Lookup(p.topic)
 	if err != nil {
@@ -202,10 +207,12 @@ func (p *partitionProducer) grabCnx() error {
 	}
 
 	if p.sequenceIDGenerator == nil {
+		// NOTE: sync last seq id with broker
 		nextSequenceID := uint64(res.Response.ProducerSuccess.GetLastSequenceId() + 1)
 		p.sequenceIDGenerator = &nextSequenceID
 	}
 	p.cnx = res.Cnx
+	// NOTE: register itself to cnx,
 	p.cnx.RegisterListener(p.producerID, p)
 	p.log.WithField("cnx", res.Cnx.ID()).Debug("Connected producer")
 
@@ -213,6 +220,7 @@ func (p *partitionProducer) grabCnx() error {
 	if len(pendingItems) > 0 {
 		p.log.Infof("Resending %d pending batches", len(pendingItems))
 		for _, pi := range pendingItems {
+			// NOTE: directly write pending batch data which already wrapped to cmd and proto marshalled
 			p.cnx.WriteData(pi.(*pendingItem).batchData)
 		}
 	}
@@ -229,6 +237,7 @@ func (p *partitionProducer) GetBuffer() internal.Buffer {
 	return b
 }
 
+// NOTE: broker notify producer the connection will broken
 func (p *partitionProducer) ConnectionClosed() {
 	// Trigger reconnection in the produce goroutine
 	p.log.WithField("cnx", p.cnx.ID()).Warn("Connection was closed")
@@ -261,18 +270,18 @@ func (p *partitionProducer) runEventsLoop() {
 		select {
 		case i := <-p.eventsChan:
 			switch v := i.(type) {
-			case *sendRequest:
+			case *sendRequest: // NOTE: append msg to batch then may flush
 				p.internalSend(v)
-			case *connectionClosed:
+			case *connectionClosed: // NOTE: broker notify conn will broken, try reconnect
 				p.reconnectToBroker()
-			case *flushRequest:
+			case *flushRequest: // NOTE: called Flush() manually
 				p.internalFlush(v)
-			case *closeProducer:
+			case *closeProducer: // NOTE: called Close() manually, notify broker conn will broken
 				p.internalClose(v)
 				return
 			}
 
-		case <-p.batchFlushTicker.C:
+		case <-p.batchFlushTicker.C: // NOTE: interval flush batch
 			p.internalFlushCurrentBatch()
 		}
 	}
@@ -294,6 +303,7 @@ func (p *partitionProducer) internalSend(request *sendRequest) {
 	// if msg is too large
 	if len(msg.Payload) > int(p.cnx.GetMaxMessageSize()) {
 		p.publishSemaphore.Release()
+		// NOTE: callback with error msg
 		request.callback(nil, request.msg, errMessageTooLarge)
 		p.log.WithField("size", len(msg.Payload)).
 			WithField("properties", msg.Properties).
@@ -307,6 +317,9 @@ func (p *partitionProducer) internalSend(request *sendRequest) {
 		deliverAt = time.Now().Add(msg.DeliverAfter)
 	}
 
+	// NOTE: add to batch conditions
+	// NOTE: 1. enable batch
+	// NOTE: 2. not a delay msg
 	sendAsBatch := !p.options.DisableBatching &&
 		msg.ReplicationClusters == nil &&
 		deliverAt.UnixNano() < 0
@@ -338,6 +351,7 @@ func (p *partitionProducer) internalSend(request *sendRequest) {
 		msg.ReplicationClusters, deliverAt)
 	if !added {
 		// The current batch is full.. flush it and retry
+		// NOTE: 1. if batching fulled, flush it
 		p.internalFlushCurrentBatch()
 
 		// after flushing try again to add the current payload
@@ -353,6 +367,8 @@ func (p *partitionProducer) internalSend(request *sendRequest) {
 		}
 	}
 
+	// NOTE: 2. if disabled batch, internal still using batch. Iit just batch ONE msg a time
+	// NOTE: 3. if msg need delay, flush it with other batched msgs. It batch MANY msgs and trigger flush
 	if !sendAsBatch || request.flushImmediately {
 		p.internalFlushCurrentBatch()
 	}
@@ -366,6 +382,7 @@ type pendingItem struct {
 	completed    bool
 }
 
+// NOTE: wrap batch and write to cnx, append to pendingQueue
 func (p *partitionProducer) internalFlushCurrentBatch() {
 	batchData, sequenceID, callbacks := p.batchBuilder.Flush()
 	if batchData == nil {
@@ -385,6 +402,7 @@ func (p *partitionProducer) internalFlush(fr *flushRequest) {
 
 	pi, ok := p.pendingQueue.PeekLast().(*pendingItem)
 	if !ok {
+		// NOTE: pendingQueue is empty, called Flush(), but interval flushed already
 		fr.waitGroup.Done()
 		return
 	}
@@ -410,6 +428,9 @@ func (p *partitionProducer) internalFlush(fr *flushRequest) {
 		},
 	}
 
+	// waiting for Flush() done:
+	// NOTE: 1. appended a empty sendRequest to LAST pendingItem.sendRequests, so need lock itself at first
+	// NOTE: 2. attached a wg to last callback
 	pi.sendRequests = append(pi.sendRequests, sendReq)
 }
 
@@ -455,8 +476,10 @@ func (p *partitionProducer) internalSendAsync(ctx context.Context, msg *Producer
 }
 
 func (p *partitionProducer) ReceivedSendReceipt(response *pb.CommandSendReceipt) {
+	// NOTE: get first enqueue batch msg
 	pi, ok := p.pendingQueue.Peek().(*pendingItem)
 
+	// NOTE: 1. received a non-exist receipt
 	if !ok {
 		// if we receive a receipt although the pending queue is empty, the state of the broker and the producer differs.
 		// At that point, it is better to close the connection to the broker to reconnect to a broker hopping it solves
@@ -466,6 +489,7 @@ func (p *partitionProducer) ReceivedSendReceipt(response *pb.CommandSendReceipt)
 		return
 	}
 
+	// NOTE: 2. received non-peek receipt
 	if pi.sequenceID != response.GetSequenceId() {
 		// if we receive a receipt that is not the one expected, the state of the broker and the producer differs.
 		// At that point, it is better to close the connection to the broker to reconnect to a broker hopping it solves
@@ -482,6 +506,7 @@ func (p *partitionProducer) ReceivedSendReceipt(response *pb.CommandSendReceipt)
 	now := time.Now().UnixNano()
 
 	// lock the pending item while sending the requests
+	// NOTE: if called Flush() manually, lock will blocked here until pi.completed become true and exit
 	pi.Lock()
 	defer pi.Unlock()
 	for idx, i := range pi.sendRequests {
@@ -507,6 +532,7 @@ func (p *partitionProducer) ReceivedSendReceipt(response *pb.CommandSendReceipt)
 			)
 
 			if sr.callback != nil {
+				// NOTE: exec callback for every pending msg
 				sr.callback(msgID, sr.msg, nil)
 			}
 

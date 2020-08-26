@@ -145,8 +145,8 @@ type partitionConsumer struct {
 	availablePermits int32
 
 	// the size of the queue channel for buffering messages
-	queueSize       int32
-	queueCh         chan []*message
+	queueSize       int32           // NOTE: receive buffer queue size
+	queueCh         chan []*message // NOTE: consumer receive messages and buffer it enqueue
 	startMessageID  trackingMessageID
 	lastDequeuedMsg trackingMessageID
 
@@ -163,6 +163,8 @@ type partitionConsumer struct {
 	compressionProviders map[pb.CompressionType]compression.Provider
 }
 
+// NOTE: lookup and connect target broker
+// NOTE: start dispatch msgs with flow control, run reader/writer event loop
 func newPartitionConsumer(parent Consumer, client *client, options *partitionConsumerOpts,
 	messageCh chan ConsumerMessage, dlq *dlqRouter) (*partitionConsumer, error) {
 	pc := &partitionConsumer{
@@ -189,6 +191,7 @@ func newPartitionConsumer(parent Consumer, client *client, options *partitionCon
 	pc.log = pc.log.WithField("name", pc.name).
 		WithField("subscription", options.subscription).
 		WithField("consumerID", pc.consumerID)
+	// NOTE: tick to send REDELIVERY CMD for consume timeout batches to broker
 	pc.nackTracker = newNegativeAcksTracker(pc, options.nackRedeliveryDelay)
 
 	err := pc.grabConn()
@@ -610,6 +613,7 @@ func (pc *partitionConsumer) dispatcher() {
 				messageCh = pc.dlq.Chan()
 			} else {
 				// pass the message to application channel
+				// NOTE: pass messages to parent consumer
 				messageCh = pc.messageCh
 			}
 
@@ -624,6 +628,7 @@ func (pc *partitionConsumer) dispatcher() {
 		case <-pc.closeCh:
 			return
 
+		// NOTE: 1. pc subscribe succeed
 		case _, ok := <-pc.connectedCh:
 			if !ok {
 				return
@@ -642,6 +647,7 @@ func (pc *partitionConsumer) dispatcher() {
 				pc.log.WithError(err).Error("unable to send initial permits to broker")
 			}
 
+		// NOTE: 2. receive next batch messages from broker
 		case msgs, ok := <-queueCh:
 			if !ok {
 				return
@@ -649,8 +655,10 @@ func (pc *partitionConsumer) dispatcher() {
 			// we only read messages here after the consumer has processed all messages
 			// in the previous batch
 			messages = msgs
+			// NOTE: in next turn, queueCh has been re-initialized, not select
 
 		// if the messageCh is nil or the messageCh is full this will not be selected
+		// NOTE: 3. send message to parent consumer until previous batch messages all consumed, then re-initialized messageCh
 		case messageCh <- nextMessage:
 			// allow this message to be garbage collected
 			messages[0] = nil
@@ -659,7 +667,8 @@ func (pc *partitionConsumer) dispatcher() {
 			// TODO implement a better flow controller
 			// send more permits if needed
 			pc.availablePermits++
-			flowThreshold := int32(math.Max(float64(pc.queueSize/2), 1))
+			flowThreshold := int32(math.Max(float64(pc.queueSize/2), 1)) // NOTE: 500
+			// NOTE: consumer have HALF of queue are spared, notify broker to send more
 			if pc.availablePermits >= flowThreshold {
 				availablePermits := pc.availablePermits
 				requestedPermits := availablePermits

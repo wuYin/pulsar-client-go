@@ -9,8 +9,10 @@ require (
 	github.com/bmizerany/perks v0.0.0-20141205001514-d9a9656a3a4b
 	github.com/gogo/protobuf v1.3.1
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/k0kubun/pp v3.0.1+incompatible
 	github.com/klauspost/compress v1.10.8
 	github.com/kr/pretty v0.2.0 // indirect
+	github.com/mattn/go-colorable v0.1.7 // indirect
 	github.com/pierrec/lz4 v2.0.5+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1

@@ -135,6 +135,7 @@ func (c *client) CreateReader(options ReaderOptions) (Reader, error) {
 	return reader, nil
 }
 
+// NOTE: only need lookup partition count
 func (c *client) TopicPartitions(topic string) ([]string, error) {
 	topicName, err := internal.ParseTopicName(topic)
 	if err != nil {
@@ -142,6 +143,7 @@ func (c *client) TopicPartitions(topic string) ([]string, error) {
 	}
 
 	id := c.rpcClient.NewRequestID()
+	// NOTE: 1. request partition metadata
 	res, err := c.rpcClient.RequestToAnyBroker(id, pb.BaseCommand_PARTITIONED_METADATA,
 		&pb.CommandPartitionedTopicMetadata{
 			RequestId: &id,
@@ -157,6 +159,7 @@ func (c *client) TopicPartitions(topic string) ([]string, error) {
 			return nil, newError(ResultLookupError, r.GetError().String())
 		}
 
+		// NOTE: partitioned topic
 		if r.GetPartitions() > 0 {
 			partitions := make([]string, r.GetPartitions())
 			for i := 0; i < int(r.GetPartitions()); i++ {

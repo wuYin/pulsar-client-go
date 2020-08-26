@@ -40,6 +40,7 @@ func newConnectionReader(cnx *connection) *connectionReader {
 	}
 }
 
+// NOTE: read cmd from conn, transfer to incomingCmdCh
 func (r *connectionReader) readFromConnection() {
 	for {
 		cmd, headersAndPayload, err := r.readSingleCommand()
@@ -59,6 +60,7 @@ func (r *connectionReader) readFromConnection() {
 	}
 }
 
+// NOTE: frame size unwrap a BaseCommand, this must be exclusive
 func (r *connectionReader) readSingleCommand() (cmd *pb.BaseCommand, headersAndPayload Buffer, err error) {
 	// First, we need to read the frame size
 	if r.buffer.ReadableBytes() < 4 {
@@ -72,6 +74,7 @@ func (r *connectionReader) readSingleCommand() (cmd *pb.BaseCommand, headersAndP
 	}
 
 	// We have enough to read frame size
+	// NOTE: 1. read frame size
 	frameSize := r.buffer.ReadUint32()
 	if frameSize > MaxFrameSize {
 		r.cnx.log.Warnf("Received too big frame size. size=%d", frameSize)
@@ -88,13 +91,16 @@ func (r *connectionReader) readSingleCommand() (cmd *pb.BaseCommand, headersAndP
 	}
 
 	// We have now the complete frame
+	// NOTE: 2. read cmd size
 	cmdSize := r.buffer.ReadUint32()
+	// NOTE: 3. read cmd
 	cmd, err = r.deserializeCmd(r.buffer.Read(cmdSize))
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Also read the eventual payload
+	// NOTE: 4. if this is a payload cmd, read it
 	headersAndPayloadSize := frameSize - (cmdSize + 4)
 	if cmdSize+4 < frameSize {
 		headersAndPayload = NewBuffer(int(headersAndPayloadSize))
@@ -106,13 +112,16 @@ func (r *connectionReader) readSingleCommand() (cmd *pb.BaseCommand, headersAndP
 func (r *connectionReader) readAtLeast(size uint32) error {
 	if r.buffer.WritableBytes() < size {
 		// There's not enough room in the current buffer to read the requested amount of data
+		// NOTE: new readable buffer size
 		totalFrameSize := r.buffer.ReadableBytes() + size
 		if r.buffer.ReadableBytes()+size > r.buffer.Capacity() {
 			// Resize to a bigger buffer to avoid continuous resizing
+			// NOTE: double expand capacity
 			r.buffer.Resize(totalFrameSize * 2)
 		} else {
 			// Compact the buffer by moving the partial data to the beginning.
 			// This will have enough room for reading the remainder of the data
+			// NOTE: align buffer to start
 			r.buffer.MoveToFront()
 		}
 	}

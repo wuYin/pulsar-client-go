@@ -108,6 +108,7 @@ func (bb *BatchBuilder) IsFull() bool {
 
 func (bb *BatchBuilder) hasSpace(payload []byte) bool {
 	msgSize := uint32(len(payload))
+	// NOTE: if add this payload, greater than maxBatch means fulled
 	return bb.numMessages > 0 && (bb.buffer.ReadableBytes()+msgSize) > uint32(bb.maxBatchSize)
 }
 
@@ -139,11 +140,14 @@ func (bb *BatchBuilder) Add(metadata *pb.SingleMessageMetadata, sequenceID uint6
 			bb.msgMetadata.DeliverAtTime = proto.Int64(int64(TimestampMillis(deliverAt)))
 		}
 
+		// NOTE: DO NOT UPDATE seq id to newest added msg, it's batch first msg seq id
 		bb.cmdSend.Send.SequenceId = proto.Uint64(sequenceID)
 	}
+	// NOTE: size wrapped and append to batch.buffer
 	addSingleMessageToBatch(bb.buffer, metadata, payload)
 
 	bb.numMessages++
+	// NOTE: add sendRequest to callback
 	bb.callbacks = append(bb.callbacks, callback)
 	return true
 }
@@ -163,6 +167,7 @@ func (bb *BatchBuilder) Flush() (batchData Buffer, sequenceID uint64, callbacks 
 	}
 	log.Debug("BatchBuilder flush: messages: ", bb.numMessages)
 
+	// NOTE: wrap batch msg
 	bb.msgMetadata.NumMessagesInBatch = proto.Int32(int32(bb.numMessages))
 	bb.cmdSend.Send.NumMessages = proto.Int32(int32(bb.numMessages))
 

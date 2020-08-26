@@ -85,6 +85,7 @@ func (t *negativeAcksTracker) track() {
 				t.Lock()
 
 				now := time.Now()
+				// NOTE: filter timeout and need redelivery msgs
 				msgIds := make([]messageID, 0)
 				for msgID, targetTime := range t.negativeAcks {
 					log.Debugf("MsgId: %v -- targetTime: %v -- now: %v", msgID, targetTime, now)
@@ -98,6 +99,7 @@ func (t *negativeAcksTracker) track() {
 				t.Unlock()
 
 				if len(msgIds) > 0 {
+					// NOTE: send REDELIVERY CMD to broker
 					t.rc.Redeliver(msgIds)
 				}
 			}

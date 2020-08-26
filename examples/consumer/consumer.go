@@ -37,6 +37,7 @@ func main() {
 		Topic:            "topic-1",
 		SubscriptionName: "my-sub",
 		Type:             pulsar.Shared,
+		SubscriptionInitialPosition: pulsar.SubscriptionPositionEarliest,
 	})
 	if err != nil {
 		log.Fatal(err)

@@ -112,7 +112,7 @@ type connectionState int32
 const (
 	connectionInit         = 0
 	connectionConnecting   = 1
-	connectionTCPConnected = 2
+	connectionTCPConnected = 2 // NOTE: succeed to dial with broker
 	connectionReady        = 3
 	connectionClosed       = 4
 )
@@ -171,8 +171,8 @@ type connection struct {
 
 	requestIDGenerator uint64
 
-	incomingRequestsCh chan *request
-	incomingCmdCh      chan *incomingCmd
+	incomingRequestsCh chan *request // NOTE: internal --> incomingRequestsCh --write--> broker
+	incomingCmdCh      chan *incomingCmd // NOTE: internal <-- incomingCmdCh <--read-- broker
 	closeCh            chan interface{}
 	writeRequestsCh    chan Buffer
 
@@ -188,6 +188,7 @@ type connection struct {
 	maxMessageSize int32
 }
 
+// NOTE: lazy build connection entity
 func newConnection(logicalAddr *url.URL, physicalAddr *url.URL, tlsOptions *TLSOptions,
 	connectionTimeout time.Duration, auth auth.Provider) *connection {
 	cnx := &connection{
@@ -222,12 +223,16 @@ func newConnection(logicalAddr *url.URL, physicalAddr *url.URL, tlsOptions *TLSO
 	return cnx
 }
 
+// NOTE: dial with broker, and handshake
 func (c *connection) start() {
 	// Each connection gets its own goroutine that will
 	go func() {
+		// NOTE: 1. dial raw conn
 		if c.connect() {
+			// NOTE: 2. one round handshake with broker
 			if c.doHandshake() {
 				connectionsOpened.Inc()
+				// NOTE: 3. run reader/writer/heartbeat goroutines
 				c.run()
 			} else {
 				connectionsHandshakeErrors.Inc()
@@ -281,6 +286,7 @@ func (c *connection) connect() bool {
 	return true
 }
 
+// NOTE: send CONNECT cmd to broker and block wait for response until 30s timeout
 func (c *connection) doHandshake() bool {
 	// Send 'Connect' command to initiate handshake
 	authData, err := c.auth.GetData()
@@ -306,6 +312,7 @@ func (c *connection) doHandshake() bool {
 		cmdConnect.ProxyToBrokerUrl = proto.String(c.logicalAddr.Host)
 	}
 	c.writeCommand(baseCommand(pb.BaseCommand_CONNECT, cmdConnect))
+	// NOTE: first conn read from beginning
 	cmd, _, err := c.reader.readSingleCommand()
 	if err != nil {
 		c.log.WithError(err).Warn("Failed to perform initial handshake")
@@ -320,6 +327,7 @@ func (c *connection) doHandshake() bool {
 			cmd.Error.GetMessage())
 		return false
 	}
+	// NOTE: sync necessary config with broker
 	if cmd.Connected.MaxMessageSize != nil {
 		c.log.Debug("Got MaxMessageSize from handshake response:", *cmd.Connected.MaxMessageSize)
 		c.maxMessageSize = *cmd.Connected.MaxMessageSize
@@ -368,15 +376,18 @@ func (c *connection) run() {
 		case <-c.closeCh:
 			return
 
+		// NOTE: send cmd to broker
 		case req := <-c.incomingRequestsCh:
 			if req == nil {
 				return
 			}
 			c.internalSendRequest(req)
 
+		// NOTE: receive cmd from broker
 		case cmd := <-c.incomingCmdCh:
 			c.internalReceivedCommand(cmd.cmd, cmd.headersAndPayload)
 
+		// NOTE: directly write wrapped data to conn
 		case data := <-c.writeRequestsCh:
 			if data == nil {
 				return
@@ -389,6 +400,7 @@ func (c *connection) run() {
 	}
 }
 
+// NOTE: tick check conn broken
 func (c *connection) runPingCheck() {
 	for {
 		select {
@@ -406,6 +418,7 @@ func (c *connection) runPingCheck() {
 	}
 }
 
+// NOTE: write raw bytes to conn directly, only use for batch
 func (c *connection) WriteData(data Buffer) {
 	select {
 	case c.writeRequestsCh <- data:
@@ -445,6 +458,7 @@ func (c *connection) internalWriteData(data Buffer) {
 	}
 }
 
+// NOTE: frame size wrap a BaseCommand, and write to net.Conn
 func (c *connection) writeCommand(cmd *pb.BaseCommand) {
 	// Wire format
 	// [FRAME_SIZE] [CMD_SIZE][CMD]
