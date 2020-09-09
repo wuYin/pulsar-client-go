@@ -376,18 +376,18 @@ func (c *connection) run() {
 		case <-c.closeCh:
 			return
 
-		// NOTE: send cmd to broker
+		// NOTE: 1. client --incomingRequestsCh--> broker
 		case req := <-c.incomingRequestsCh:
 			if req == nil {
 				return
 			}
 			c.internalSendRequest(req)
 
-		// NOTE: receive cmd from broker
+		// NOTE: 2. client <--incomingCmdCh-- broker
 		case cmd := <-c.incomingCmdCh:
 			c.internalReceivedCommand(cmd.cmd, cmd.headersAndPayload)
 
-		// NOTE: directly write wrapped data to conn
+		// NOTE: 3.  client --wrapped-data--> broker
 		case data := <-c.writeRequestsCh:
 			if data == nil {
 				return
@@ -485,9 +485,10 @@ func (c *connection) receivedCommand(cmd *pb.BaseCommand, headersAndPayload Buff
 	c.incomingCmdCh <- &incomingCmd{cmd, headersAndPayload}
 }
 
+// NOTE: select specific handler to handle CMD
 func (c *connection) internalReceivedCommand(cmd *pb.BaseCommand, headersAndPayload Buffer) {
 	c.log.Debugf("Received command: %s -- payload: %v", cmd, headersAndPayload)
-	c.setLastDataReceived(time.Now())
+	c.setLastDataReceived(time.Now()) // NOTE: update heartbeat
 
 	switch *cmd.Type {
 	case pb.BaseCommand_SUCCESS:

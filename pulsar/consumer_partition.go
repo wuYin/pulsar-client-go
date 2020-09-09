@@ -217,8 +217,10 @@ func newPartitionConsumer(parent Consumer, client *client, options *partitionCon
 		}
 	}
 
+	// NOTE: dynamic flow control
 	go pc.dispatcher()
 
+	// NOTE: monitor eventCh and handle CMD events
 	go pc.runEventsLoop()
 
 	return pc, nil
@@ -830,6 +832,7 @@ func (pc *partitionConsumer) reconnectToBroker() {
 	}
 }
 
+// NOTE: lookup partitioned topic's target broker, send SUBSCRIBE CMD to it and handle resp
 func (pc *partitionConsumer) grabConn() error {
 	lr, err := pc.client.lookupService.Lookup(pc.topic)
 	if err != nil {
@@ -887,6 +890,7 @@ func (pc *partitionConsumer) grabConn() error {
 
 	pc.conn = res.Cnx
 	pc.log.Info("Connected consumer")
+	// NOTE: register current partition consumer to connection
 	pc.conn.AddConsumeHandler(pc.consumerID, pc)
 
 	msgType := res.Response.GetType()

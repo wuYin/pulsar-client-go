@@ -124,6 +124,7 @@ func newConsumer(client *client, options ConsumerOptions) (Consumer, error) {
 			return nil, err
 		}
 
+		// NOTE: 1. single topic
 		return topicSubscribe(client, options, topic, messageCh, dlq)
 	}
 
@@ -132,6 +133,7 @@ func newConsumer(client *client, options ConsumerOptions) (Consumer, error) {
 			return nil, err
 		}
 
+		// NOTE: 2. multi topics
 		return newMultiTopicConsumer(client, options, options.Topics, messageCh, dlq)
 	}
 
@@ -145,6 +147,7 @@ func newConsumer(client *client, options ConsumerOptions) (Consumer, error) {
 		if err != nil {
 			return nil, err
 		}
+		// NOTE: 3. regexp subscribe
 		return newRegexConsumer(client, options, tn, pattern, messageCh, dlq)
 	}
 

@@ -219,6 +219,9 @@ func (msg *message) ProducerName() string {
 	return msg.producerName
 }
 
+// NOTE: track a batch msg, ack to erase one by one
+// NOTE: size is msg count in one batch
+// NOTE: generate a full bit 1 number
 func newAckTracker(size int) *ackTracker {
 	var batchIDs *big.Int
 	if size <= 64 {
@@ -240,6 +243,7 @@ type ackTracker struct {
 	batchIDs *big.Int
 }
 
+// NOTE: erase a particular bit
 func (t *ackTracker) ack(batchID int) bool {
 	if batchID < 0 {
 		return true

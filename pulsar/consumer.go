@@ -109,6 +109,7 @@ type ConsumerOptions struct {
 
 	// Sets a `MessageChannel` for the consumer
 	// When a message is received, it will be pushed to the channel for consumption
+	// NOTE: user defined receiver channel
 	MessageChannel chan ConsumerMessage
 
 	// Sets the size of the consumer receive queue.
