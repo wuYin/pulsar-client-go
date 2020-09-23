@@ -496,6 +496,7 @@ func (pc *partitionConsumer) MessageReceived(response *pb.CommandMessage, header
 		bytesReceived.Add(float64(len(payload)))
 		prefetchedBytes.Add(float64(len(payload)))
 
+		// NOTE: msg index in batch, as batchIndex for trackingMsgId
 		msgID := newTrackingMessageID(
 			int64(pbMsgID.GetLedgerId()),
 			int64(pbMsgID.GetEntryId()),
