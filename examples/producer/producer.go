@@ -18,13 +18,11 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/k0kubun/pp"
 )
 
 func main() {
@@ -39,23 +37,24 @@ func main() {
 	defer client.Close()
 
 	producer, err := client.CreateProducer(pulsar.ProducerOptions{
-		Topic: "topic-1",
+		Topic: fmt.Sprintf("topic-01"),
 		BatchingMaxPublishDelay: 100*time.Millisecond,
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	defer producer.Close()
+	_ = producer
+	// defer producer.Close()
 
-	ctx := context.Background()
-
-	for i := 0; i < 1; i++ {
-		producer.SendAsync(ctx, &pulsar.ProducerMessage{
-			Payload: []byte(fmt.Sprintf("hello-%d", i)),
-		}, func(id pulsar.MessageID, message *pulsar.ProducerMessage, err error) {
-			pp.Println("done")
-		})
-	}
-	pp.Println(producer.Flush())
+	// ctx := context.Background()
+	//
+	// for i := 0; i < 1; i++ {
+	// 	producer.SendAsync(ctx, &pulsar.ProducerMessage{
+	// 		Payload: []byte(fmt.Sprintf("hello-%d", i)),
+	// 	}, func(id pulsar.MessageID, message *pulsar.ProducerMessage, err error) {
+	// 		pp.Println("done")
+	// 	})
+	// }
+	// pp.Println(producer.Flush())
 }

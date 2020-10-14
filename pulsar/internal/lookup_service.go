@@ -94,6 +94,7 @@ const lookupResultMaxRedirect = 20
 func (ls *lookupService) Lookup(topic string) (*LookupResult, error) {
 	lookupRequestsCount.Inc()
 	id := ls.rpcClient.NewRequestID()
+	// NOTE: 3. 发起 Lookup 请求
 	res, err := ls.rpcClient.RequestToAnyBroker(id, pb.BaseCommand_LOOKUP, &pb.CommandLookupTopic{
 		RequestId:     &id,
 		Topic:         &topic,

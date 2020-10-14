@@ -56,7 +56,7 @@ type RPCClient interface {
 	// Send a request and block until the result is available
 	RequestToAnyBroker(requestID uint64, cmdType pb.BaseCommand_Type, message proto.Message) (*RPCResult, error)
 
-	Request(logicalAddr *url.URL, physicalAddr *url.URL, requestID uint64,
+	Request(logicalAddr *url.URL, physicalAddr *url.URL, reqrunEventsLoopuestID uint64,
 		cmdType pb.BaseCommand_Type, message proto.Message) (*RPCResult, error)
 
 	RequestOnCnxNoWait(cnx Connection, cmdType pb.BaseCommand_Type, message proto.Message)
