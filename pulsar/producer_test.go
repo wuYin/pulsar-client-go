@@ -904,7 +904,8 @@ func TestSendTimeout(t *testing.T) {
 	noRetry := uint(0)
 	producer, err := client.CreateProducer(ProducerOptions{
 		Topic:                topicName,
-		SendTimeout:          2 * time.Second,
+		SendTimeout:          3 * time.Second,
+		// DisableBlockIfQueueFull: true,
 		MaxReconnectToBroker: &noRetry,
 	})
 	assert.Nil(t, err)
@@ -924,6 +925,7 @@ func TestSendTimeout(t *testing.T) {
 	id, err := producer.Send(context.Background(), &ProducerMessage{
 		Payload: make([]byte, 1024),
 	})
+	fmt.Println("send failed, error: ", err)
 	assert.NotNil(t, err)
 	assert.Nil(t, id)
 

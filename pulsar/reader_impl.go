@@ -68,7 +68,7 @@ func newReader(client *client, options ReaderOptions) (Reader, error) {
 	if subscriptionName == "" {
 		subscriptionName = "reader"
 	}
-	subscriptionName += "-" + generateRandomName()
+	// subscriptionName += "-" + generateRandomName()
 
 	receiverQueueSize := options.ReceiverQueueSize
 	if receiverQueueSize <= 0 {
@@ -79,7 +79,7 @@ func newReader(client *client, options ReaderOptions) (Reader, error) {
 		topic:                      options.Topic,
 		consumerName:               options.Name,
 		subscription:               subscriptionName,
-		subscriptionType:           Exclusive,
+		subscriptionType:           Shared,
 		receiverQueueSize:          receiverQueueSize,
 		startMessageID:             startMessageID,
 		startMessageIDInclusive:    options.StartMessageIDInclusive,

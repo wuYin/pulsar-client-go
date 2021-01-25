@@ -54,7 +54,9 @@ func (r *connectionReader) readFromConnection() {
 		if headersAndPayload != nil {
 			payloadLen = headersAndPayload.ReadableBytes()
 		}
-		r.cnx.log.Debug("Got command! ", cmd, " with payload size: ", payloadLen)
+		if cmd.Type != nil && *cmd.Type != pb.BaseCommand_SEND_RECEIPT && *cmd.Type != pb.BaseCommand_PING && *cmd.Type != pb.BaseCommand_PONG {
+			r.cnx.log.Debug("Got command! ", cmd, " with payload size: ", payloadLen)
+		}
 		r.cnx.receivedCommand(cmd, headersAndPayload)
 	}
 }

@@ -23,11 +23,16 @@ import (
 	"log"
 
 	"github.com/apache/pulsar-client-go/pulsar"
+	"github.com/sirupsen/logrus"
 )
+
+func init() {
+	logrus.SetLevel(logrus.DebugLevel)
+}
 
 func main() {
 	client, err := pulsar.NewClient(pulsar.ClientOptions{
-		URL: "pulsar://localhost:6650",
+		URL: "pulsar://pek01-psr-activity-cluster-01-pulsar-proxy.pek01.rack.zhihu.com:6650",
 	})
 
 	if err != nil {
@@ -37,7 +42,7 @@ func main() {
 	defer client.Close()
 
 	producer, err := client.CreateProducer(pulsar.ProducerOptions{
-		Topic: "topic-1",
+		Topic: "zhihu/activity/kafka-publish",
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -47,13 +52,15 @@ func main() {
 
 	ctx := context.Background()
 
-	for i := 0; i < 10; i++ {
+	fmt.Println("sending1")
+	for i := 0; i < 1; i++ {
 		if msgId, err := producer.Send(ctx, &pulsar.ProducerMessage{
-			Payload: []byte(fmt.Sprintf("hello-%d", i)),
+			Payload: []byte("{}"),
 		}); err != nil {
 			log.Fatal(err)
 		} else {
 			log.Println("Published message: ", msgId)
 		}
 	}
+	fmt.Println("sending2")
 }

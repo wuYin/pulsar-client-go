@@ -217,7 +217,7 @@ func (bc *batchContainer) Flush() (
 		// No-Op for empty batch
 		return nil, 0, nil
 	}
-	bc.log.Debug("BatchBuilder flush: messages: ", bc.numMessages)
+	// bc.log.Debug("BatchBuilder flush: messages: ", bc.numMessages)
 
 	bc.msgMetadata.NumMessagesInBatch = proto.Int32(int32(bc.numMessages))
 	bc.cmdSend.Send.NumMessages = proto.Int32(int32(bc.numMessages))

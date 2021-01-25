@@ -236,6 +236,7 @@ func (c *consumer) Name() string {
 
 func (c *consumer) internalTopicSubscribeToPartitions() error {
 	partitions, err := c.client.TopicPartitions(c.topic)
+	fmt.Println("partitions", partitions)
 	if err != nil {
 		return err
 	}

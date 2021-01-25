@@ -283,11 +283,13 @@ func (c *connection) doHandshake() bool {
 	}
 
 	if c.logicalAddr.Host != c.physicalAddr.Host {
+		fmt.Println("c.logicalAddr.Host, brokerAddr: ", c.logicalAddr.Host)
 		cmdConnect.ProxyToBrokerUrl = proto.String(c.logicalAddr.Host)
 	}
 	c.writeCommand(baseCommand(pb.BaseCommand_CONNECT, cmdConnect))
 	cmd, _, err := c.reader.readSingleCommand()
 	if err != nil {
+		fmt.Printf("handshake failed: %#v\n", err)
 		c.log.WithError(err).Warn("Failed to perform initial handshake")
 		return false
 	}
@@ -439,7 +441,7 @@ func (c *connection) WriteData(data Buffer) {
 }
 
 func (c *connection) internalWriteData(data Buffer) {
-	c.log.Debug("Write data: ", data.ReadableBytes())
+	// c.log.Debug("Write data: ", data.ReadableBytes())
 	if _, err := c.cnx.Write(data.ReadableSlice()); err != nil {
 		c.log.WithError(err).Warn("Failed to write on connection")
 		c.TriggerClose()
@@ -475,7 +477,9 @@ func (c *connection) receivedCommand(cmd *pb.BaseCommand, headersAndPayload Buff
 }
 
 func (c *connection) internalReceivedCommand(cmd *pb.BaseCommand, headersAndPayload Buffer) {
-	c.log.Debugf("Received command: %s -- payload: %v", cmd, headersAndPayload)
+	if *cmd.Type != pb.BaseCommand_SEND_RECEIPT && *cmd.Type != pb.BaseCommand_PING && *cmd.Type != pb.BaseCommand_PONG {
+		c.log.Debugf("Received command: %s -- payload: %v", cmd, headersAndPayload)
+	}
 	c.setLastDataReceived(time.Now())
 
 	switch *cmd.Type {
@@ -664,11 +668,11 @@ func (c *connection) sendPing() {
 }
 
 func (c *connection) handlePong() {
-	c.log.Debug("Received PONG response")
+	// c.log.Debug("Received PONG response")
 }
 
 func (c *connection) handlePing() {
-	c.log.Debug("Responding to PING request")
+	// c.log.Debug("Responding to PING request")
 	c.writeCommand(baseCommand(pb.BaseCommand_PONG, &pb.CommandPong{}))
 }
 
