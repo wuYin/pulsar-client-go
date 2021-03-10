@@ -536,6 +536,10 @@ func (c *consumer) SeekByTime(time time.Time) error {
 	return c.consumers[0].SeekByTime(time)
 }
 
+func (c *consumer) ListTopics() ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
 var r = &random{
 	R: rand.New(rand.NewSource(time.Now().UnixNano())),
 }

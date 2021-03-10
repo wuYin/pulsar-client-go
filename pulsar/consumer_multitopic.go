@@ -204,3 +204,7 @@ func (c *multiTopicConsumer) SeekByTime(time time.Time) error {
 func (c *multiTopicConsumer) Name() string {
 	return c.consumerName
 }
+
+func (c *multiTopicConsumer) ListTopics() ([]string, error) {
+	return nil, errors.New("not implemented")
+}

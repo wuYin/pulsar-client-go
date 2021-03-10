@@ -353,6 +353,11 @@ func (c *regexConsumer) topics() ([]string, error) {
 	return filtered, nil
 }
 
+// only for local
+func (c *regexConsumer) ListTopics() ([]string, error) {
+	return c.topics()
+}
+
 type consumerError struct {
 	err      error
 	topic    string

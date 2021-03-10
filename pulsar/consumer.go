@@ -221,4 +221,7 @@ type Consumer interface {
 
 	// Name returns the name of consumer.
 	Name() string
+
+	// ListTopics list topics which matched the regexp
+	ListTopics() ([]string, error)
 }
